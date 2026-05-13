@@ -2,20 +2,21 @@
 import requests
 import sqlite3
 import time
+import os
 from datetime import datetime, timezone
 
-# --- Ğ–Ğ•Ğ¡Ğ¢ĞšĞĞ¯ ĞšĞĞĞ¤Ğ˜Ğ“Ğ£Ğ ĞĞ¦Ğ˜Ğ¯ ---
+# --- CONFIGURATION ---
 API_KEY = "ac1eae60740a1e6a4e987c7577539963"
 HEADERS = {"x-apisports-key": API_KEY}
 BASE_URL = "https://v3.football.api-sports.io"
 DB_NAME = "radar_nexus.db"
-DROP_THRESHOLD = 0.10  # 10% Ğ¿Ğ°Ğ´ĞµĞ½Ğ¸Ñ ĞºÑÑ„Ğ° = Ğ˜Ğ½ÑĞ°Ğ¹Ğ´ĞµÑ€ÑĞºĞ¸Ğ¹ Ğ¿Ñ€Ğ¾Ğ³Ñ€ÑƒĞ·
+DROP_THRESHOLD = 0.10  # 10% line drop
 
-# --- Ğ¢Ğ•Ğ›Ğ•Ğ“Ğ ĞĞœ ĞšĞĞĞ¤Ğ˜Ğ“Ğ£Ğ ĞĞ¦Ğ˜Ğ¯ ---
-TG_TOKEN = "8603529040:AAG2ZvdFjyo4L6JlrpGVQcoksDsIQdhOl4M"
+# --- TELEGRAM ---
+TG_TOKEN = "8603529040:AAG2VvdFjyo4L6LlrpGVQcoksDsIQdhOl4M"
 TG_CHAT_ID = "8301693491"
 
-# --- ĞœĞĞ¢Ğ Ğ˜Ğ¦Ğ Ğ‘Ğ£ĞšĞœĞ•ĞšĞ•Ğ ĞĞ’ ---
+# --- BOOKMAKERS MATRIX ---
 BOOKMAKERS = {
     17: "Pinnacle (Smart Money)",
     8: "Bet365 (World Classic)",
@@ -24,13 +25,14 @@ BOOKMAKERS = {
 
 class DropOddsRadar:
     def __init__(self):
-        self.conn = sqlite3.connect(DB_NAME)
+        self.db_path = os.path.join(os.path.dirname(__file__), DB_NAME)
+        self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
         self._init_db()
 
-    def _init_db(self):
+    def _init_db(self%:
         self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS live_tracking (
+            CREATE TABLE IF NOT EXISTS ive_tracking (
                 fixture_id INTEGER,
                 bookmaker_id INTEGER,
                 league_id INTEGER,
@@ -48,123 +50,21 @@ class DropOddsRadar:
         self.conn.commit()
 
     def send_tg_alert(self, match_time, home, away, bookmaker_id, target, initial, current, drop_percent):
-        bm_name = BOOKMAKERS.get(bookmaker_id, f"ID {bookmaker_id}")
-        
+        bm_name = BOOKMAKERS.get(bookmaker_id, f"µ D {bookmaker_id}")
         msg = (
-            f" <b>ğŸšĞĞĞĞœĞĞ›Ğ˜Ğ¯ SMART MONEY</b> \n\n"
-            f"ğŸšâš½ï¸ <i>{home} â€” {away}</i>\n"
-            f" <b>ğŸ•ĞĞ°Ñ‡Ğ°Ğ»Ğ¾:</b> {match_time} (UTC)\n\n"
-            f" <b>ğŸ“ĞŸÑ€Ğ¾Ğ³Ñ€ÑƒĞ· Ğ½Ğ°:</b> {target}\n"
-            f" <b>ğŸĞ Ğ°Ğ´Ğ°Ñ€:</b> {bm_name}\n"
-            f" <b>ğŸ”ĞĞ±Ğ²Ğ°Ğ»:</b> {initial} â” {current} (<b>-{drop_percent:.1f}%</b>)\n\n"
-            f"âš¡ï¸ <i>MATH-TRINITY NEXUS</i>"
-        )
-        
-        url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-        payload = {
-            "chat_id": TG_CHAT_ID,
-            "text": msg,
-            "parse_mode": "HTML"
-        }
-        try:
-            resp = requests.post(url, json=payload, timeout=10)
-            if resp.status_code != 200:
-                print(f"ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞ¸ TG: {resp.text}")
-        except Exception as e:
-            print(f"Ğ¡Ğ±Ğ¾Ğ¹ ÑĞµÑ‚Ğ¸ Ğ¿Ñ€Ğ¸ Ğ¾Ñ‚Ğ¿Ñ€Ğ°Ğ²ĞºĞµ TG: {e}")
-
-    def scan_upcoming_matches(self):
-        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] Ğ—Ğ°Ğ¿Ñ€Ğ¾Ñ Ñ€Ğ°ÑĞ¿Ğ¸ÑĞ°Ğ½Ğ¸Ñ Ğ½Ğ° {today_str}...")
-        
-        try:
-            resp = requests.get(f"{BASE_URL}/fixtures?date={today_str}&timezone=Europe/London", headers=HEADERS, timeout=15).json()
-            fixtures = resp.get('response', [])
-        except Exception as e:
-            print(f"ĞÑˆĞ¸Ğ±ĞºĞ° Ğ¿Ğ¾Ğ»ÑƒÑ‡ĞµĞ½Ğ¸Ñ Ñ€Ğ°ÑĞ¿Ğ¸ÑĞ°Ğ½Ğ¸Ñ: {e}")
-            return []
-        
-        now = datetime.now(timezone.utc)
-        upcoming = []
-        
-        for f in fixtures:
-            if f['fixture']['status']['short'] == 'NS':
-                match_time = datetime.fromtimestamp(f['fixture']['timestamp'], tz=timezone.utc)
-                time_diff = (match_time - now).total_seconds() / 3600
-                
-                if 0 < time_diff <= 12:
-                    upcoming.append(f)
-        return upcoming
-
-    def track_odds(self, fixtures):
-        if not fixtures:
-            print("ĞĞµÑ‚ Ğ¼Ğ°Ñ‚Ñ‡ĞµĞ¹ Ğ² Ğ°ĞºÑ‚Ğ¸Ğ²Ğ½Ğ¾Ğ¼ Ğ¾ĞºĞ½Ğµ.")
-            return
-
-        print(f"Ğ’ Ñ€Ğ°Ğ´Ğ°Ñ€Ğµ {len(fixtures)} Ğ¼Ğ°Ñ‚Ñ‡ĞµĞ¹. Ğ¡ĞºĞ°Ğ½Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¸Ğµ ĞœĞ°Ñ‚Ñ€Ğ¸Ñ†Ñ‹ Ğ‘ÑƒĞºĞ¼ĞµĞºĞµÑ€Ğ¾Ğ²...")
-        
-        for f in fixtures:
-            f_id = f['fixture']['id']
-            match_time = f['fixture']['date']
-            home_team = f['teams']['home']['name']
-            away_team = f['teams']['away']['name']
-            league_id = f['league']['id']
-
-            try:
-                odds_resp = requests.get(f"{BASE_URL}/odds?fixture={f_id}", headers=HEADERS, timeout=10).json()
-                odds_data = odds_resp.get('response', [])
-                if not odds_data: continue
-
-                all_bookmakers = odds_data[0].get('bookmakers', [])
-                for bm_id in BOOKMAKERS.keys():
-                    bm = next((b for b in all_bookmakers if b['id'] == bm_id), None)
-                    if not bm: continue
-                        
-                    bets = bm.get('bets', [])
-                    mw = next((b for b in bets if b['id'] == 1), None)
-                    if mw:
-                        values = mw.get('values', [])
-                        odd_1 = next((float(v['odd']) for v in values if v['value'] == 'Home'), 0.0)
-                        odd_2 = next((float(v['odd']) for v in values if v['value'] == 'Away'), 0.0)
-                        if odd_1 > 0 and odd_2 > 0:
-                            self._analyze_drop(f_id, bm_id, league_id, match_time, home_team, away_team, odd_1, odd_2)
-            except Exception as e:
-                print(f"Ğ¡Ğ±Ğ¾Ğ¹ Ğ¿Ğ°Ñ€ÑĞ¸Ğ½Ğ³Ğ° Ñ„Ğ¸ĞºÑÑ‚ÑƒÑ€Ñ‹ {f_id}: {e}")
-            time.sleep(0.2)
-
-    def _analyze_drop(self, f_id, bm_id, league_id, match_time, home_team, away_team, odd_1, odd_2):
-        now_str = datetime.now(timezone.utc).strftime("%H:%M:%S")
-        self.cursor.execute("SELECT initial_odd_1, initial_odd_2 FROM live_tracking WHERE fixture_id = ? AND bookmaker_id = ?", (f_id, bm_id))
-        row = self.cursor.fetchone()
-
-        if not row:
-            self.cursor.execute('''
-                INSERT INTO live_tracking (fixture_id, bookmaker_id, league_id, match_time, home_team, away_team, initial_odd_1, initial_odd_2, current_odd_1, current_odd_2, last_update)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (f_id, bm_id, league_id, match_time, home_team, away_team, odd_1, odd_2, odd_1, odd_2, now_str))
-            self.conn.commit()
-        else:
-            init_1, init_2 = row
-            drop_1 = (init_1 - odd_1) / init_1 if init_1 > 0 else 0
-            drop_2 = (init_2 - odd_2) / init_2 if init_2 > 0 else 0
-
-            self.cursor.execute('''
-                UPDATE live_tracking SET current_odd_1 = ?, current_odd_2 = ?, last_update = ? WHERE fixture_id = ? AND bookmaker_id = ?
-            ''', (odd_1, odd_2, now_str, f_id, bm_id))
-            self.conn.commit()
-
-            if drop_1 >= DROP_THRESHOLD:
-                print(f"[!] ALERT: {home_team} ĞŸ1 (-{drop_1*100:.1f}%)")
-                self.send_tg_alert(match_time, home_team, away_team, bm_id, "ĞŸ1 (Ğ¥Ğ¾Ğ·ÑĞµĞ²Ğ°)", init_1, odd_1, drop_1*100)
-                self.cursor.execute("UPDATE live_tracking SET initial_odd_1 = ? WHERE fixture_id = ? AND bookmaker_id = ?", (odd_1, f_id, bm_id))
-                self.conn.commit()
-            elif drop_2 >= DROP_THRESHOLD:
-                print(f"[!] ALERT: {away_team} ĞŸ2 (-{drop_2*100:.1f}%)")
-                self.send_tg_alert(match_time, home_team, away_team, bm_id, "ĞŸ2 (Ğ“Ğ¾ÑÑ‚Ğ¸)", init_2, odd_2, drop_2*100)
-                self.cursor.execute("UPDATE live_tracking SET initial_odd_2 = ? WHERE fixture_id = ? AND bookmaker_id = ?", (odd_2, f_id, bm_id))
-                self.conn.commit()
-
-if __name__ == "__main__":
-    radar = DropOddsRadar()
-    matches = radar.scan_upcoming_matches()
-    radar.track_odds(matches)
+            f"!!! SHARP SIGNAL DETECTED !!!—ˆ‚ˆˆ“X]ÚˆÊÛY_HHØ]Ø^_Wˆ‚ˆˆ”İ\ˆÛX]Úİ[Y_H
+UÊW—ˆ‚ˆˆ•\™Ù]ˆİ\™Ù]Wˆ‚ˆˆ”˜Y\ˆØ›WÛ˜[Y_Wˆ‚ˆˆ‘›ÜˆÚ[š]X[HOˆØİ\œ™[H
+^Ù›ÜÜ\˜Ù[‹ŒYŸIJW—ˆ‚ˆˆ”Ş\İ[NˆPUU’S’UH‘VTÈ‚ˆ
+Bˆ\›HˆšÎ‹ËØ\K[YÜ˜[K›Ü™ËØ›İÕ×ÕÒÑSŸKÜÙ[™Y\ÜØYÙH‚ˆ^[ØYHÈ˜Ú]ÚYˆ×ĞÒUÒQ^ˆ\ÙËœ\œÙWÛ[ÙHˆ’SŸBˆN‚ˆ™\]Y\İËœÜİ
+\›œÛÛ\^[ØY[Y[İ]LL
+Bˆ^Ù\^Ù\[Ûˆ\ÈN‚ˆš[
+ˆ•È\œ›ÜˆÙ_HŠB‚ˆYˆØØ[—İ\ÛÛZ[™×ÛX]Ú\ÊÙ[ŠN‚ˆÙ^WÜİˆH]][YK››İÊ[Y^›Û™K]ÊKœİ™[YJ‰VKI[KIYŠBˆš[
+ˆ–ŞÙ]][YK››İÊ[Y^›Û™K]ÊKœİ™[YJ	ÉR‰SN‰TÉÊ_WHĞĞS“’S‘ÎˆİÙ^WÜİŸHŠBˆN‚ˆ™\ÜH™\]Y\İË™Ù]
+ŠĞTÑWÕT“KÙš^\™\ÏÙ]O^İÙ^WÜİŸI[Y^›Û™OQ]\›ÜKÓÛ™Ûˆ‹XY\œÏRPQT”Ë[Y[İ]LMJKšœÛÛŠ
+Bˆš^\™\ÈH™\Ü™Ù]
+	Ü™\ÜÛœÙIË×JBˆ^Ù\^Ù\[Ûˆ\ÈN‚ˆš[
+ˆTH\œ›ÜˆÙ_HŠBˆ™]\›ˆ×Bˆˆ›İÈH]][YK››İÊ[Y^›Û™K]ÊBˆ\ÛÛZ[™ÈH×Bˆ›Üˆˆ[ˆš^\™\Î‚ˆYˆ–ÉÙš^\™I×VÉÜİ]\É×VÉÜÚÜ	×HOH	Ó”ÉÎ‚ˆX]Úİ[YHH]][YK™œ›Û][Y\İ[\
+–ÉÙš^\™I×VÉİ[Y\İ[\	×K][Y^›Û™K]ÊBˆ[YWÙY™ˆH
+X]Úİ[YHH›İÊKİ[ÜÙXÛÛ™Ê
+HÈÍŒˆYˆ[YWÙY™ˆHL‚ˆ\ÛÛZ[™Ëš¦—§t¡˜¤(€€€€€€€É•ÑÕÉ¸ÕÁ½µ¥¹œ((€€€‘•˜ÑÉ…­}½‘‘Ì¡Í•±˜°™¥áÑÕÉ•Ì¤è(€€€€€€€¥˜¹½Ğ™¥áÑÕÉ•Ìè(€€€€€€€€€€€ÁÉ¥¹Ğ ‰9¼µ…Ñ¡•Ì¥¸ÕÉÉ•¹Ğİ¥¹‘½Ü¸ˆ¤(€€€€€€€€€€€É•ÑÕÉ¸((€€€€€€€™½È˜¥¸™¥áÑÕÉ•Ìè(€€€€€€€€€€€™}¥€ô™l™¥áÑÕÉ”ul¥t(€€€€€€€€€€€ÑÉäè(€€€€€€€€€€€€€€€½‘‘Í}É•ÍÁÀ€ôÉ•ÅÕ•ÍÑÌ¹•Ğ¡˜­	M}UI1ô½½‘‘Ìı™¥áÑÕÉ”õí™}¥‘ôˆ°¡•…‘•ÉÌõ!IL°Ñ¥µ•½ÕĞôÄÀ¤¹©Í½¸ ¤(€€€€€€€€€€€€€€€½‘‘Í}‘…Ñ„€ô½‘‘Í}É•ÍÀ¹•Ğ É•ÍÁ½¹Í”œ°mt¤(€€€€€€€€€€€€€€€¥˜¹½Ğ½‘‘Í}‘…Ñ„è½¹Ñ¥¹Õ”((€€€€€€€€€€€€€€€…±±}‰½½­µ…­•ÉÌ€ô½‘‘Í}‘…Ñ…lÁt¹•Ğ ‰½½­µ…­•ÉÌœ°mt¤(€€€€€€€€€€€€€€€™½È‰µ}¥¥¸	==-5-IL¹­•åÌ ¤è(€€€€€€€€€€€€€€€€€€€‰´€ô¹•áĞ ¡ˆ™½Èˆ¥¸…±±}‰½½­µ…­•ÉÌ¥˜‰l¥t€ôô‰µ}¥¤°9½¹”¤(€€€€€€€€€€€€€€€€€€€¥˜¹½Ğ‰´è½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€€€€€(€€€€€€€€€€€€€€€€€€€‰•ÑÌ€ô‰´¹•Ğ ‰•ÑÌœ°mt¤(€€€€€€€€€€€€€€€€€€€µÜ€ô¹•áĞ ¡ˆ™½Èˆ¥¸‰•ÑÌ¥˜‰l¥t€ôô€Ä¤°9½¹”¤(€€€€€€€€€€€€€€€€€€€¥˜µÜè(€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ•Ì€ôµÜ¹•Ğ Ù…±Õ•Ìœ°mt¤(€€€€€€€€€€€€€€€€€€€€€€€¼Ä€ô¹•áĞ ¡™±½…Ğ¡Øm½‘t¤™½È¥¸Ù…±Õ•Ì¥˜ÙlÙ…±Õ”t€ôô€!½µ”œ¤°€À¸À¤(€€€€€€€€€€€€€€€€€€€€€€€¼È€ô¹•áĞ ¡™±½…Ğ¡Øm½‘t¤™½È¥¸Ù…±Õ•Ì¥˜ÙlÙ…±Õ”t€ôô€İ…äœ¤°€À¸À¤(€€€€€€€€€€€€€€€€€€€€€€€¥˜¼Ä€ø€À…¹¼È€ø€Àè(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±˜¹}…¹…±åé•}‘É½À¡™}¥°‰µ}¥°™l±•…Õ”ul¥t°™l™¥áÑÕÉ”ul‘…Ñ”t°™lÑ•…µÌul¡½µ”ul¹…µ”t°™lÑ•…µÌul…İ…äul¹…µ”t°¼Ä°¼È¤(€€€€€€€€€€€•á•ÁĞá•ÁÑ¥½¸…Ì”è(€€€€€€€€€€€€€€€ÁÉ¥¹Ğ¡˜­¥áÑÕÉ”í™}¥‘ôÉÉ½Èèí•ôˆ¤(€€€€€€€€€€€Ñ¥µ”¹Í±••À À¸Ì¤((€€€‘•˜}…¹…±åé•}‘É½À¡Í•±˜°™}¥°‰µ}¥°±•…Õ•}¥°µ…Ñ¡}Ñ¥µ”°¡½µ”°…İ…ä°¼Ä°¼È¤è(€€€€€€€¹½İ}ÍÑÈ€ô‘…Ñ•Ñ¥µ”¹¹½Ü¡Ñ¥µ•é½¹”¹ÕÑŒ¤¹ÍÑÉ™Ñ¥µ” ˆ• è•4è•Lˆ¤(€€€€€€€Í•±˜¹ÕÉÍ½È¹•á•ÕÑ” ‰M1P¥¹¥Ñ¥…±}½‘‘|Ä°¥¹¥Ñ¥…±}½‘‘|ÈI=4±¥Ù•}ÑÉ…­¥¹œ]!I™¥áÑÕÉ•}¥€ô€ü9‰½½­µ…­•É}¥€ô€üˆ°€¡™}¥°‰µ}¥¤¤(€€€€€€€É½Ü€ôÍ•±˜¹ÕÉÍ½È¹™•Ñ¡½¹” ¤((€€€€€€€¥˜¹½ĞÉ½Üè(€€€€€€€€€€€Í•±˜¹ÕÉÍ½È¹•á•ÕÑ” ‰%9MIP%9Q<±¥Ù•}ÑÉ…­¥¹œY1UL€ ü°ü°ü°ü°ü°ü°ü°ü°ü°ü°ü¤ˆ°€(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡™}¥°‰µ}¥°±•…Õ•}¥°µ…Ñ¡}Ñ¥µ”°¡½µ”°…İ…ä°¼Ä°¼È°¼Ä°¼È°¹½İ}ÍÑÈ¤¤(€€€€€€€€€€€Í•±˜¹½¹¹¸¹½µµ¥Ğ ¤(€€€€€€€•±Í”è(€€€€€€€€€€€¤Ä°¤È€ôÉ½Ü(€€€€€€€€€€€Ä€ô€¡¤Ä€´¼Ä¤€¼¤Ä¥˜¤Ä€ø€À•±Í”€À(€€€€€€€€€€€È€ô€¡¤È€´¼È¤€¼¤È¥˜¤È€ø€À•±Í”€À((€€€€€€€€€€€Í•±˜¹ÕÉÍ½È¹•á•ÕÑ” ‰UAQ±¥Ù•}ÑÉ…­¥¹œMPÕÉÉ•¹Ñ}½‘‘|Äôü°ÕÉÉ•¹Ñ}½‘‘|Èôü°±…ÍÑ}ÕÁ‘…Ñ”ôü]!I™¥áÑÕÉ•}¥ôü9‰½½­µ…­•É}¥ôüˆ°€(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¼Ä°¼È°¹½İ}ÍÑÈ°™}¥°‰µ}¥¤¤(€€€€€€€€€€€Í•±˜¹½¹¸¹½µµ¥Ğ ¤((€€€€€€€€€€€¥˜Ä€øôI=A}Q!IM!=1è(€€€€€€€€€€€€€€€ÁÉ¥¹Ğ¡˜‰mtÁ1IPèí¡½µ•ô@Ä€ µíÄ¨ÄÀÀè¸Å™ô”¤ˆ¤(€€€€€€€€€€€€€€€Í•±˜¹Í•¹‘}Ñ}…±•ÉĞ¡µ…Ñ¡}Ñ¥µ”°¡½µ”°…İ…ä°‰µ}¥°€‰!=5€¡@Ä¤ˆ°¤Ä°¼Ä°ÄœÄÀÀ¤(€€€€€€€€€€€€€€€Í•±˜¹ÕÉÍ½È¹•á•ÕÑ” ‰UAQ±¥Ù•}ÑÉ…­¥¹œMP¥¹¥Ñ¥…±}½‘‘|Äôü]!I™¥áÑÕÉ•}¥ôü9‰½½­µ…­•É}¥ôüˆ°€¡¼Ä°™}¥°‰µ}¥¤¤(€€€€€€€€€€€€€€€Í•±˜¹½¹¸¹½µµ¥Ğ ¤(€€€€€€€€€€€•±Í¥˜È€øôI=A}Q!IM!=1è(€€€€€€€€€€€€€€€ÁÉ¥¹Ğ¡˜‰`…\1RUˆØ]Ø^_Hˆ
+^ÙŠŒL‹ŒYŸIJHŠBˆÙ[‹œÙ[™İ
