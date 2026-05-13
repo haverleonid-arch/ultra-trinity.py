@@ -5,24 +5,25 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 
+# --- CONFIG ---
 API_KEY = "ac1eae60740a1e6a4e987c7577539963"
 HEADERS = {"x-apisports-key": API_KEY}
 BASE_URL = "https://v3.football.api-sports.io"
-DB_NAME = "nexus_v5.db"
+DB_NAME = "nexus_v6.db"
 TG_TOKEN = "8603529040:AAG2ZvdFjyo4L6JlrpGVQcoksDsIQdhOl4M"
 ADMIN_ID = 8301693491
 
 BOOKMAKERS = {
-    17: "Pinnacle (Smart)",
-    8: "Bet365 (Classic)",
-    1: "1xBet (Mass)"
+    17: "Pinnacle (Smart Money)",
+    8: "Bet365 (World Classic)",
+    1: "1xBet (Mass Market)"
 }
 
 class NexusState:
     def __init__(self):
         self.active = False
         self.threshold = 0.10
-        self.last_scan = "None"
+        self.last_scan = "Ожидание..."
         self.matches = 0
 
 state = NexusState()
@@ -36,10 +37,12 @@ cur.execute('''CREATE TABLE IF NOT EXISTS live_tracking (
 )''')
 conn.commit()
 
+# --- TITAN UI KEYBOARD ---
 main_kb = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="START"), KeyboardButton(text="STOP")],
-    [KeyboardButton(text="THRESHOLD: 10%"), KeyboardButton(text="THRESHOLD: 1%")], 
-    [KeyboardButton(text="STATUS"), KeyboardButton(text="GITHUB UPDATE")]
+    [KeyboardButton(text="🟢 АКТИВИРОВАТЬ РАДАР"), KeyboardButton(text="🛑 ОСТАНОВИТЬ")],
+    [KeyboardButton(text="🛡 БОЕВОЙ ПОРОГ (10%)"), KeyboardButton(text="🧪 ТЕСТ ПОРОГ (1%)")], 
+    [KeyboardButton(text="📊 ДАШБОРД СТАТУСА"), KeyboardButton(text="📡 ТЕСТОВЫЙ СИГНАЛ")],
+    [KeyboardButton(text="🔄 СИНХРОНИЗАЦИЯ С GITHUB")]
 ], resize_keyboard=True)
 
 bot = Bot(token=TG_TOKEN)
@@ -48,48 +51,83 @@ dp = Dispatcher()
 @dp.message(Command("start"))
 async def c_start(m: Message):
     if m.from_user.id == ADMIN_ID:
-        await m.answer("[NEXUS V5.0 ONLINE]\nMarkets: 1x2, Asian Handicap, Asian Totals.\nCI/CD Protocol: ACTIVE", reply_markup=main_kb)
+        msg = (
+            "🧬 <b>MATH-TRINITY NEXUS [V6.0 TITAN]</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "📡 <b>Сенсоры активны:</b>\n"
+            "┣ 1x2 (Классика)\n"
+            "┣ Asian Handicap (Smart Money)\n"
+            "┗ Asian Totals (Инсайды)\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🚀 <i>CI/CD Протокол: ПОДКЛЮЧЕН</i>"
+        )
+        await m.answer(msg, reply_markup=main_kb, parse_mode="HTML")
 
-@dp.message(F.text == "START")
+@dp.message(F.text == "🟢 АКТИВИРОВАТЬ РАДАР")
 async def b_start(m: Message):
     if m.from_user.id == ADMIN_ID:
         state.active = True
-        await m.answer("[+] Radar STARTED.")
+        await m.answer("⚡️ <b>СИСТЕМА ЗАПУЩЕНА</b>\nРадар начал сканирование линии.", parse_mode="HTML")
 
-@dp.message(F.text == "STOP")
+@dp.message(F.text == "🛑 ОСТАНОВИТЬ")
 async def b_stop(m: Message):
     if m.from_user.id == ADMIN_ID:
         state.active = False
-        await m.answer("[-] Radar STOPPED.")
+        await m.answer("📴 <b>СИСТЕМА ПРИОСТАНОВЛЕНА</b>\nПарсинг API прекращен.", parse_mode="HTML")
 
-@dp.message(F.text == "THRESHOLD: 10%")
+@dp.message(F.text == "🛡 БОЕВОЙ ПОРОГ (10%)")
 async def b_t10(m: Message):
     if m.from_user.id == ADMIN_ID:
         state.threshold = 0.10
-        await m.answer("[*] Threshold: 10% (Live Mode).")
+        await m.answer("🛡 Установлен <b>БОЕВОЙ ФИЛЬТР (10%)</b>.\n<i>Отслеживаем только крупные вливания капитала.</i>", parse_mode="HTML")
 
-@dp.message(F.text == "THRESHOLD: 1%")
+@dp.message(F.text == "🧪 ТЕСТ ПОРОГ (1%)")
 async def b_t1(m: Message):
     if m.from_user.id == ADMIN_ID:
         state.threshold = 0.01
-        await m.answer("[*] Threshold: 1% (Test Mode).")
+        await m.answer("🧪 Установлен <b>ТЕСТОВЫЙ ФИЛЬТР (1%)</b>.\n<i>Сверхчувствительный режим (возможен спам).</i>", parse_mode="HTML")
 
-@dp.message(F.text == "STATUS")
+@dp.message(F.text == "📊 ДАШБОРД СТАТУСА")
 async def b_status(m: Message):
     if m.from_user.id == ADMIN_ID:
-        s = "ACTIVE" if state.active else "STOPPED"
-        await m.answer(f"[STATUS]\nState: {s}\nDrop: {state.threshold*100}%\nScan: {state.last_scan}\nTrack: {state.matches}")
+        s = "🟢 В АКТИВНОМ ПОИСКЕ" if state.active else "🛑 РЕЖИМ СНА"
+        msg = (
+            "📊 <b>NEXUS ТЕЛЕМЕТРИЯ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💠 Статус: <b>{s}</b>\n"
+            f"🎯 Фильтр дропа: <b>{state.threshold*100}%</b>\n"
+            f"⏱ Последний пинг: <b>{state.last_scan}</b>\n"
+            f"⚽️ Матчей в трекинге: <b>{state.matches}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━━━"
+        )
+        await m.answer(msg, parse_mode="HTML")
 
-@dp.message(F.text == "GITHUB UPDATE")
+@dp.message(F.text == "📡 ТЕСТОВЫЙ СИГНАЛ")
+async def b_test_signal(m: Message):
+    if m.from_user.id == ADMIN_ID:
+        msg = (
+            "⚠️ <b>[TEST] SHARP SIGNAL DETECTED</b> ⚠️\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "⚽️ <b>Real Madrid - Barcelona</b>\n"
+            "🎯 Маркет: <b>ASIAN HANDICAP</b>\n"
+            "📌 Исход: <b>Home -0.75</b>\n"
+            "🏢 Радар: <b>Pinnacle (Smart Money)</b>\n"
+            "📉 Прогруз: 2.10 ➔ 1.85 (<b>-11.9%</b>)\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "<i>Это искусственный сигнал для проверки связи.</i>"
+        )
+        await m.answer(msg, parse_mode="HTML")
+
+@dp.message(F.text == "🔄 СИНХРОНИЗАЦИЯ С GITHUB")
 async def b_update(m: Message):
     if m.from_user.id == ADMIN_ID:
-        await m.answer("[*] PULLING REPOSITORY FROM GITHUB...\nServer will restart in 3 seconds.")
+        await m.answer("⏳ <b>ИНИЦИАЛИЗАЦИЯ CI/CD ПРОТОКОЛА...</b>\n<i>Подгрузка архитектуры из облака. Сервер перезагрузится через 3 секунды.</i>", parse_mode="HTML")
         try:
             subprocess.run(["git", "fetch", "--all"], cwd="/root/ultra-trinity", check=True)
             subprocess.run(["git", "reset", "--hard", "origin/main"], cwd="/root/ultra-trinity", check=True)
             subprocess.Popen(["systemctl", "restart", "nexus.service"])
         except Exception as e:
-            await m.answer(f"[!] UPDATE FAILED: {e}")
+            await m.answer(f"❌ <b>ОШИБКА ОБНОВЛЕНИЯ:</b>\n<code>{e}</code>", parse_mode="HTML")
 
 async def check_odds(f_id, bm_id, l_id, m_t, home, away, market_id, target, current_odd):
     now = datetime.now(timezone.utc).strftime("%H:%M:%S")
@@ -106,8 +144,18 @@ async def check_odds(f_id, bm_id, l_id, m_t, home, away, market_id, target, curr
         
         if drop >= state.threshold:
             markets = {1: "1x2", 5: "ASIAN HANDICAP", 3: "ASIAN TOTALS"}
-            msg = f"[SHARP SIGNAL]\nMatch: {home} - {away}\nMarket: {markets.get(market_id, str(market_id))}\nTarget: {target}\nRadar: {BOOKMAKERS.get(bm_id, bm_id)}\nDrop: {initial_odd} -> {current_odd} (-{drop*100:.1f}%)"
-            await bot.send_message(ADMIN_ID, msg)
+            m_name = markets.get(market_id, str(market_id))
+            msg = (
+                f"🚨 <b>SHARP SIGNAL DETECTED</b> 🚨\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━\n"
+                f"⚽️ <b>{home} - {away}</b>\n"
+                f"🎯 Маркет: <b>{m_name}</b>\n"
+                f"📌 Исход: <b>{target}</b>\n"
+                f"🏢 Радар: <b>{BOOKMAKERS.get(bm_id, bm_id)}</b>\n"
+                f"📉 Прогруз: {initial_odd} ➔ {current_odd} (<b>-{drop*100:.1f}%</b>)\n"
+                f"━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            await bot.send_message(ADMIN_ID, msg, parse_mode="HTML")
             cur.execute("UPDATE live_tracking SET initial_odd=? WHERE fixture_id=? AND bookmaker_id=? AND market_id=? AND target=?", (current_odd, f_id, bm_id, market_id, target))
         conn.commit()
 
@@ -159,7 +207,6 @@ async def scanner():
 
 async def main():
     asyncio.create_task(scanner())
-    print("NEXUS V5.0 CI/CD DAEMON RUNNING...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
