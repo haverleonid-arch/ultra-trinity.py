@@ -10,7 +10,7 @@ API_KEY = "ac1eae60740a1e6a4e987c7577539963"
 HEADERS = {"x-apisports-key": API_KEY}
 BASE_URL = "https://v3.football.api-sports.io"
 DB_NAME = "radar_nexus.db"
-DROP_THRESHOLD = 0.10
+DROP_THRESHOLD = 0.01 
 
 # --- TELEGRAM ---
 TG_TOKEN = "8603529040:AAG2ZvdFjyo4L6JlrpGVQcoksDsIQdhOl4M"
@@ -51,13 +51,12 @@ class DropOddsRadar:
     def send_tg_alert(self, match_time, home, away, bookmaker_id, target, initial, current, drop_percent):
         bm_name = BOOKMAKERS.get(bookmaker_id, f"ID {bookmaker_id}")
         msg = (
-            f"!!! SHARP SIGNAL DETECTED !!!\n\n"
-            f"Match: {home} - {away}\n"
-            f"Start: {match_time} (UTC)\n\n"
-            f"Target: {target}\n"
-            f"Radar: {bm_name}\n"
-            f"Drop: {initial} -> {current} (-{drop_percent:.1f}%)\n\n"
-            f"System: MATH-TRINITY NEXUS"
+            f"<b> NEXUS TEST ALERT üö</b>\n\n"
+            f"üö‚öΩÔ∏è Match: <b>{home} - {away}</b>\n"
+            f" Target: <b>{target}</b>\n"
+            f"üì Radar: {bm_name}\n"
+            f"üè Drop: {initial} -> {current} (<b>-{drop_percent:.1f}%</b>)\n\n"
+            f"üî‚ö°Ô∏è <i>Status: SYSTEM_LIVE</i>"
         )
         url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
         payload = {"chat_id": TG_CHAT_ID, "text": msg, "parse_mode": "HTML"}
@@ -68,7 +67,7 @@ class DropOddsRadar:
 
     def scan_upcoming_matches(self):
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] SCANNING: {today_str}")
+        print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] SCANNING: {today_str} | MODE: TEST (1%)")
         try:
             resp = requests.get(f"{BASE_URL}/fixtures?date={today_str}&timezone=Europe/London", headers=HEADERS, timeout=15).json()
             return resp.get('response', [])
@@ -82,7 +81,6 @@ class DropOddsRadar:
             if f['fixture']['status']['short'] != 'NS': continue
             m_time = datetime.fromtimestamp(f['fixture']['timestamp'], tz=timezone.utc)
             if not (0 < (m_time - now).total_seconds() / 3600 <= 12): continue
-
             f_id = f['fixture']['id']
             try:
                 res = requests.get(f"{BASE_URL}/odds?fixture={f_id}", headers=HEADERS, timeout=10).json()
