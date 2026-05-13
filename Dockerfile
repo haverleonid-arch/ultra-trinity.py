@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Выдача прав на исполнение
-RUN chmod +x radar_nexus.py
+RUN chmod +x main.py
 
 # Базовая команда
-CMD ["python3", "radar_nexus.py"]
+CMD ["python3", "main.py"]

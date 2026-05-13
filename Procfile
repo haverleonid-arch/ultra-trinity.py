@@ -1,1 +1,1 @@
-worker: python3 radar_nexus.py
+worker: python3 main.py

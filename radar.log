@@ -1,0 +1,5 @@
+  File "/root/ultra-trinity/radar_nexus.py", line 33
+    def _init_db(self%:
+                     ^
+SyntaxError: invalid syntax
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb5 in position 0: invalid start byte
