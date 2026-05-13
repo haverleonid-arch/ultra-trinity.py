@@ -10,7 +10,7 @@ API_KEY = "ac1eae60740a1e6a4e987c7577539963"
 HEADERS = {"x-apisports-key": API_KEY}
 BASE_URL = "https://v3.football.api-sports.io"
 DB_NAME = "radar_nexus.db"
-DROP_THRESHOLD = 0.01 
+DROP_THRESHOLD = 0.10 
 
 # --- TELEGRAM ---
 TG_TOKEN = "8603529040:AAG2ZvdFjyo4L6JlrpGVQcoksDsIQdhOl4M"
@@ -49,16 +49,17 @@ class DropOddsRadar:
         self.conn.commit()
 
     def send_tg_alert(self, match_time, home, away, bookmaker_id, target, initial, current, drop_percent):
+        url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
         bm_name = BOOKMAKERS.get(bookmaker_id, f"ID {bookmaker_id}")
         msg = (
-            f"<b> NEXUS TEST ALERT üö</b>\n\n"
-            f"üö‚öΩÔ∏è Match: <b>{home} - {away}</b>\n"
-            f" Target: <b>{target}</b>\n"
-            f"üì Radar: {bm_name}\n"
-            f"üè Drop: {initial} -> {current} (<b>-{drop_percent:.1f}%</b>)\n\n"
-            f"üî‚ö°Ô∏è <i>Status: SYSTEM_LIVE</i>"
+            f"[!!! SHARP SIGNAL DETECTED !!!]\n\n"
+            f"Match: {home} - {away}\n"
+            f"Start: {match_time} (UTC)\n\n"
+            f"Target: {target}\n"
+            f"Radar: {bm_name}\n"
+            f"Drop: {initial} -> {current} (-{drop_percent:.1f}%)\n\n"
+            f"System: MATH-TRINITY NEXUS"
         )
-        url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
         payload = {"chat_id": TG_CHAT_ID, "text": msg, "parse_mode": "HTML"}
         try:
             requests.post(url, json=payload, timeout=10)
@@ -67,26 +68,30 @@ class DropOddsRadar:
 
     def scan_upcoming_matches(self):
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] SCANNING: {today_str} | MODE: TEST (1%)")
+        print(f"[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] --- SCANNING: {today_str} ---")
         try:
             resp = requests.get(f"{BASE_URL}/fixtures?date={today_str}&timezone=Europe/London", headers=HEADERS, timeout=15).json()
-            return resp.get('response', [])
+            data = resp.get('response', [])
+            print(f"[+] Found {len(data)} fixtures.")
+            return data
         except:
             return []
 
     def track_odds(self, fixtures):
         if not fixtures: return
         now = datetime.now(timezone.utc)
-        for f in fixtures:
-            if f['fixture']['status']['short'] != 'NS': continue
-            m_time = datetime.fromtimestamp(f['fixture']['timestamp'], tz=timezone.utc)
-            if not (0 < (m_time - now).total_seconds() / 3600 <= 12): continue
+        active = [f for f in fixtures if f['fixture']['status']['short'] == 'NS' and 0 < (datetime.fromtimestamp(f['fixture']['timestamp'], tz=timezone.utc) - now).total_seconds() / 3600 <= 12]
+        
+        print(f"[*] Processing {len(active)} matches in 12h window...")
+
+        for i, f in enumerate(active):
             f_id = f['fixture']['id']
+            home, away = f['teams']['home']['name'], f['teams']['away']['name']
+            print(f"[{i+1}/{len(active)}] Check: {home} vs {away}...", end="\r")
+            
             try:
                 res = requests.get(f"{BASE_URL}/odds?fixture={f_id}", headers=HEADERS, timeout=10).json()
-                data = res.get('response', [])
-                if not data: continue
-                bms = data[0].get('bookmakers', [])
+                bms = res.get('response', [{}])[0].get('bookmakers', [])
                 for bm_id in BOOKMAKERS.keys():
                     bm = next((b for b in bms if b['id'] == bm_id), None)
                     if not bm: continue
@@ -96,10 +101,11 @@ class DropOddsRadar:
                         o1 = next((float(v['odd']) for v in vals if v['value'] == 'Home'), 0.0)
                         o2 = next((float(v['odd']) for v in vals if v['value'] == 'Away'), 0.0)
                         if o1 > 0 and o2 > 0:
-                            self._analyze_drop(f_id, bm_id, f['league']['id'], f['fixture']['date'], f['teams']['home']['name'], f['teams']['away']['name'], o1, o2)
+                            self._analyze_drop(f_id, bm_id, f['league']['id'], f['fixture']['date'], home, away, o1, o2)
             except:
                 pass
-            time.sleep(0.3)
+            time.sleep(0.35)
+        print(f"\n[{datetime.now(timezone.utc).strftime('%H:%M:%S')}] --- DONE ---")
 
     def _analyze_drop(self, f_id, bm_id, league_id, match_time, home, away, o1, o2):
         now_str = datetime.now(timezone.utc).strftime("%H:%M:%S")
@@ -112,9 +118,11 @@ class DropOddsRadar:
             d1, d2 = (i1-o1)/i1 if i1>0 else 0, (i2-o2)/i2 if i2>0 else 0
             self.cursor.execute("UPDATE live_tracking SET current_odd_1=?, current_odd_2=?, last_update=? WHERE fixture_id=? AND bookmaker_id=?", (o1, o2, now_str, f_id, bm_id))
             if d1 >= DROP_THRESHOLD:
+                print(f"\n[!!!] SIGNAL: {home} P1 (-{d1*100:.1f}%)")
                 self.send_tg_alert(match_time, home, away, bm_id, "HOME (P1)", i1, o1, d1*100)
                 self.cursor.execute("UPDATE live_tracking SET initial_odd_1=? WHERE fixture_id=? AND bookmaker_id=?", (o1, f_id, bm_id))
             elif d2 >= DROP_THRESHOLD:
+                print(f"\n[!!!] SIGNAL: {away} P2 (-{d2*100:.1f}%)")
                 self.send_tg_alert(match_time, home, away, bm_id, "AWAY (P2)", i2, o2, d2*100)
                 self.cursor.execute("UPDATE live_tracking SET initial_odd_2=? WHERE fixture_id=? AND bookmaker_id=?", (o2, f_id, bm_id))
         self.conn.commit()
