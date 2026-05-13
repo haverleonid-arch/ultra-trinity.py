@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import requests
 import sqlite3
 import time
@@ -16,9 +17,9 @@ TG_CHAT_ID = "8301693491"
 
 # --- МАТРИЦА БУКМЕКЕРОВ ---
 BOOKMAKERS = {
-    17: " Pinnacle (Smart Money / Crypto)",
-    8: "� Bet365 (World Classic)",
-    1: "� 1xBet (Mass Market)"
+    17: "Pinnacle (Smart Money)",
+    8: "Bet365 (World Classic)",
+    1: "1xBet (Mass Market)"
 }
 
 class DropOddsRadar:
@@ -50,7 +51,7 @@ class DropOddsRadar:
         bm_name = BOOKMAKERS.get(bookmaker_id, f"ID {bookmaker_id}")
         
         msg = (
-            f"� <b>�АНОМАЛИЯ SMART MONEY</b> \n\n"
+            f" <b>�АНОМАЛИЯ SMART MONEY</b> \n\n"
             f"�⚽️ <i>{home} — {away}</i>\n"
             f" <b>�Начало:</b> {match_time} (UTC)\n\n"
             f" <b>�Прогруз на:</b> {target}\n"
@@ -102,7 +103,7 @@ class DropOddsRadar:
 
         print(f"В радаре {len(fixtures)} матчей. Сканирование Матрицы Букмекеров...")
         
-        for index, f in enumerate(fixtures):
+        for f in fixtures:
             f_id = f['fixture']['id']
             match_time = f['fixture']['date']
             home_team = f['teams']['home']['name']
@@ -153,10 +154,12 @@ class DropOddsRadar:
             self.conn.commit()
 
             if drop_1 >= DROP_THRESHOLD:
+                print(f"[!] ALERT: {home_team} П1 (-{drop_1*100:.1f}%)")
                 self.send_tg_alert(match_time, home_team, away_team, bm_id, "П1 (Хозяева)", init_1, odd_1, drop_1*100)
                 self.cursor.execute("UPDATE live_tracking SET initial_odd_1 = ? WHERE fixture_id = ? AND bookmaker_id = ?", (odd_1, f_id, bm_id))
                 self.conn.commit()
             elif drop_2 >= DROP_THRESHOLD:
+                print(f"[!] ALERT: {away_team} П2 (-{drop_2*100:.1f}%)")
                 self.send_tg_alert(match_time, home_team, away_team, bm_id, "П2 (Гости)", init_2, odd_2, drop_2*100)
                 self.cursor.execute("UPDATE live_tracking SET initial_odd_2 = ? WHERE fixture_id = ? AND bookmaker_id = ?", (odd_2, f_id, bm_id))
                 self.conn.commit()
